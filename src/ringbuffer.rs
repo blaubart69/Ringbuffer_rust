@@ -1,18 +1,15 @@
-pub struct Ringbuffer<T> {
-    buf : Vec<T>,
-    write_idx : usize,
-    inserted : usize
+pub struct Ringbuffer<'a, T> {
+    write_idx : usize
+    , inserted : usize
+    , buf : &'a mut [T]
 }
 
-impl<T> Ringbuffer<T> where T : Clone + Default {
+impl<'a, T> Ringbuffer<'a, T> where T : Sized {
 
-    pub fn new(size : usize) -> Ringbuffer<T> {
-        
-        let mut _buf : Vec<T> = Vec::with_capacity(size);
-        _buf.resize(size, Default::default());
+    pub fn new(backingslice : &mut [T]) -> Ringbuffer<T> {
         
         Ringbuffer {
-           buf : _buf,
+           buf : backingslice,
            write_idx : 0,
            inserted : 0
         }
@@ -34,24 +31,24 @@ impl<T> Ringbuffer<T> where T : Clone + Default {
 pub struct RingbufferIter<'a, T> {
     idx  : usize,
     items_to_yield : usize,
-    ring  : &'a Ringbuffer<T>
+    ring  : &'a Ringbuffer<'a, T>
 }
 
-impl<'a, T> IntoIterator for &'a Ringbuffer<T> {
+impl<'a, T> IntoIterator for &'a Ringbuffer<'a, T> {
     type Item     = &'a T;
     type IntoIter = RingbufferIter<'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
 
         RingbufferIter {
-            idx : self.write_idx,
-            ring : self,
-            items_to_yield : if self.inserted < self.buf.len() {
-                self.inserted
-            }
-            else {
-                self.buf.len()
-            },
+            idx             : self.write_idx,
+            ring            : self,
+            items_to_yield  : if self.inserted < self.buf.len() {
+                                self.inserted
+                              }
+                              else {
+                                self.buf.len()
+                              },
         }        
     }
 }
@@ -64,13 +61,12 @@ impl<'a, T> Iterator for RingbufferIter<'a, T> {
             None
         }
         else {
-            self.items_to_yield -= 1;
-
             if self.idx == 0 {
                 self.idx = self.ring.buf.len();
             }
 
-            self.idx -= 1;
+            self.items_to_yield -= 1;
+            self.idx            -= 1;
 
             self.ring.buf.get(self.idx)
         }
@@ -84,14 +80,16 @@ use super::Ringbuffer;
 
     #[test]
     fn empty() {
-        let mut rb : Ringbuffer::<i32> = Ringbuffer::new(17);       
+        let mut buf = [0;17];
+        let mut rb = Ringbuffer::new(&mut buf);       
         let mut iter = rb.into_iter();
         assert!(iter.next().is_none());
     }
 
     #[test]
     fn one_item() {
-        let mut rb : Ringbuffer::<i32> = Ringbuffer::new(1);       
+        let mut buf = [0;17];
+        let mut rb = Ringbuffer::new(&mut buf);       
         rb.push(18);
         let mut iter = rb.into_iter();
         assert_eq!(18, *iter.next().unwrap());
@@ -101,7 +99,8 @@ use super::Ringbuffer;
 
     #[test]
     fn two_items() {
-        let mut rb : Ringbuffer::<i32> = Ringbuffer::new(2);       
+        let mut buf = [0;2];
+        let mut rb  = Ringbuffer::new(&mut buf);       
         rb.push(18);
         rb.push(19);
         let mut iter = rb.into_iter();
@@ -111,7 +110,8 @@ use super::Ringbuffer;
     }    
     #[test]
     fn two_items_overflow() {
-        let mut rb : Ringbuffer::<i32> = Ringbuffer::new(2);       
+        let mut buf = [0;2];
+        let mut rb = Ringbuffer::new(&mut buf);       
         rb.push(18);
         rb.push(19);
         rb.push(20);
@@ -122,7 +122,8 @@ use super::Ringbuffer;
     }    
     #[test]
     fn push_20_items_with_buffersize_10() {
-        let mut rb : Ringbuffer::<i32> = Ringbuffer::new(10);
+        let mut buf = [0;10];
+        let mut rb = Ringbuffer::new(&mut buf);
         for i in 1..21 {       
             rb.push(i);
         }
@@ -135,7 +136,8 @@ use super::Ringbuffer;
     }
     #[test]
     fn push_20_items_with_buffersize_50() {
-        let mut rb : Ringbuffer::<i32> = Ringbuffer::new(50);
+        let mut buf = [0;50];
+        let mut rb = Ringbuffer::new(&mut buf);
         for i in 1..21 {       
             rb.push(i);
         }
@@ -148,7 +150,8 @@ use super::Ringbuffer;
     }
     #[test]
     fn push_20_items_get_last_10_with_buffersize_50() {
-        let mut rb : Ringbuffer::<i32> = Ringbuffer::new(50);
+        let mut buf = [0;50];
+        let mut rb = Ringbuffer::new(&mut buf);
         for i in 1..21 {       
             rb.push(i);
         }
