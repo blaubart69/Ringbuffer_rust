@@ -4,7 +4,7 @@ pub struct Ringbuffer<'a, T> {
     , buf : &'a mut [T]
 }
 
-impl<'a, T> Ringbuffer<'a, T> where T : Sized {
+impl<'a, T> Ringbuffer<'a, T> {
 
     pub fn new(backingslice : &mut [T]) -> Ringbuffer<T> {
         
@@ -160,6 +160,23 @@ use super::Ringbuffer;
         for v in rb.into_iter().take(10) {
             assert_eq!(i,*v);
             i -= 1;
+        }
+    }
+
+    //#[derive(Clone,Copy)]
+    #[derive(Default)]
+    struct Pair {
+        l : i32,
+        r : i32
+    }
+
+    #[test]
+    fn test_struct() {
+        let mut buf: [Pair;10] = Default::default();
+        let mut rb = Ringbuffer::new(&mut buf);
+
+        for i in 0..21 {
+            rb.push(Pair { l:i, r:i});
         }
     }
 
